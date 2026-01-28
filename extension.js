@@ -1,36 +1,95 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+function getDateInString(date) {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
 
-/**
- * @param {vscode.ExtensionContext} context
- */
-function activate(context) {
+function getTodayString() {
+	const today = new Date();
+	return getDateInString(today);
+}
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "commit-streak" is now active!');
+function getYesterdayString() {
+	const today = new Date();
+	const yesterday = new Date(today);
+	yesterday.setDate(today.getDate() - 1);
+	return getDateInString(yesterday);
+}
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('commit-streak.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
+function setupCommitListener(repo, context, statusBarItem) {
+	const todayStr = getTodayString();
+	const yesterdayStr = getYesterdayString();
+	let streak = context.globalState.get("streak");
 
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from commit streak!');
+	const disposable = repo.onDidCommit(() => {
+		const currentLastDay = context.globalState.get("lastDayCommit");
+
+		if (!currentLastDay || (currentLastDay !== todayStr && currentLastDay !== yesterdayStr)) {
+			streak = 1;
+			context.globalState.update("streak", 1);
+		} else if (currentLastDay === yesterdayStr) {
+			streak++;
+			context.globalState.update("streak", streak);
+		}
+		context.globalState.update("lastDayCommit", todayStr);
+
+		statusBarItem.text = `$(flame) ${streak}`;
 	});
-
 	context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
-function deactivate() {}
+function activate(context) {
+	const gitExtension = vscode.extensions.getExtension('vscode.git');
+	const todayStr = getTodayString();
+	const yesterdayStr = getYesterdayString();
 
+	let streak = context.globalState.get("streak");
+	const lastDayCommit = context.globalState.get("lastDayCommit");
+
+	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+	statusBarItem.text = `$(flame) ${streak}`;
+	statusBarItem.tooltip = "Commit Streak"
+
+	if (!gitExtension) {
+		vscode.window.showErrorMessage("Git extension not found");
+		return;
+	}
+
+	if (!lastDayCommit || (lastDayCommit !== todayStr && lastDayCommit !== yesterdayStr)) {
+		context.globalState.update("streak", 0);
+	}
+
+	context.subscriptions.push(vscode.commands.registerCommand('commit-streak.resetStreak', () => {
+		context.globalState.update("lastDayCommit", undefined);
+		context.globalState.update("streak", undefined);
+		statusBarItem.text = `$(flame) 0`;
+		vscode.window.showInformationMessage('Streak reset');
+	}));
+
+	let git = undefined
+	try {
+		git = gitExtension.exports.getAPI(1);
+	} catch {
+		vscode.window.showErrorMessage("Git not found")
+		return;
+	}
+
+    const disposable = git.onDidOpenRepository((repo) => {
+		setupCommitListener(repo, context, statusBarItem);
+    });
+
+	context.subscriptions.push(disposable);
+
+	git.repositories.forEach((repo) => {
+		setupCommitListener(repo, context, statusBarItem);
+	});
+
+	statusBarItem.show();
+	context.subscriptions.push(statusBarItem);
+}
 module.exports = {
 	activate,
-	deactivate
 }
