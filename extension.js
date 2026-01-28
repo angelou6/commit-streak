@@ -49,6 +49,11 @@ function activate(context) {
 	let streak = context.globalState.get("streak");
 	const lastDayCommit = context.globalState.get("lastDayCommit");
 
+	if (!lastDayCommit || (lastDayCommit !== todayStr && lastDayCommit !== yesterdayStr)) {
+		streak = 0;
+		context.globalState.update("streak", 0);
+	}
+
 	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
 	statusBarItem.text = `$(flame) ${streak}`;
 	statusBarItem.tooltip = "Commit Streak"
@@ -56,10 +61,6 @@ function activate(context) {
 	if (!gitExtension) {
 		vscode.window.showErrorMessage("Git extension not found");
 		return;
-	}
-
-	if (!lastDayCommit || (lastDayCommit !== todayStr && lastDayCommit !== yesterdayStr)) {
-		context.globalState.update("streak", 0);
 	}
 
 	context.subscriptions.push(vscode.commands.registerCommand('commit-streak.resetStreak', () => {
@@ -77,9 +78,9 @@ function activate(context) {
 		return;
 	}
 
-    const disposable = git.onDidOpenRepository((repo) => {
+	const disposable = git.onDidOpenRepository((repo) => {
 		setupCommitListener(repo, context, statusBarItem);
-    });
+	});
 
 	context.subscriptions.push(disposable);
 
