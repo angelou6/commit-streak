@@ -1,9 +1,13 @@
 {
   "name": "commit-streak",
+  "icon": "images/icon.png",
   "displayName": "commit streak",
   "description": "Adds a streak that keeps track of your commits",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/angelou6/commit-streak"
+  },
   "version": "0.0.1",
-  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.108.1"
   },
